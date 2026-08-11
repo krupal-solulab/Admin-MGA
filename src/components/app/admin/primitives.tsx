@@ -67,11 +67,13 @@ export function ActorBadge({ actor }: { actor: "ai" | "human" }) {
 }
 
 export function formatDateTime(iso: string) {
-  return new Date(iso).toLocaleString(undefined, {
+  // Use a fixed locale so SSR and client produce identical output (avoids hydration mismatch).
+  return new Date(iso).toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: true,
   });
 }
 
