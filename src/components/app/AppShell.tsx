@@ -1,4 +1,4 @@
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   UserCog,
@@ -7,18 +7,12 @@ import {
   ScrollText,
   ShieldCheck,
   ShieldAlert,
+  LogOut,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { ROLE_IDENTITY, useRole, type Role } from "./role";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { clearIdentity, getIdentity } from "@/lib/api/identity";
 import { cn } from "@/lib/utils";
 
 const adminNav: { to: string; label: string; icon: LucideIcon }[] = [
@@ -30,7 +24,7 @@ const adminNav: { to: string; label: string; icon: LucideIcon }[] = [
 ];
 
 function Sidebar({ pathname }: { pathname: string }) {
-  const { role } = useRole();
+  const identity = getIdentity();
 
   return (
     <aside className="hidden w-64 shrink-0 flex-col bg-sidebar text-sidebar-foreground lg:flex">
@@ -48,65 +42,66 @@ function Sidebar({ pathname }: { pathname: string }) {
 
       <nav className="flex-1 space-y-1 px-3 py-5">
         <p className="text-eyebrow px-2 pb-2 text-sidebar-foreground/45">Admin</p>
-        {role === "admin" ? (
-          adminNav.map((item) => {
-            const active = pathname === item.to;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
-                  active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
-                )}
-              >
-                <item.icon
-                  className={cn("size-4", active && "text-sidebar-primary")}
-                  aria-hidden
-                />
-                {item.label}
-              </Link>
-            );
-          })
-        ) : (
-          <p className="px-3 text-sm text-sidebar-foreground/55">
-            Admin navigation is hidden for the {role} role.
-          </p>
-        )}
+        {adminNav.map((item) => {
+          const active = pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={cn(
+                "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
+                active
+                  ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground/75 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
+              )}
+            >
+              <item.icon className={cn("size-4", active && "text-sidebar-primary")} aria-hidden />
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
       <div className="border-t border-sidebar-border px-5 py-4 text-[11px] text-sidebar-foreground/55">
-        Tenant-scoped · demo-mga
+        Tenant-scoped · {identity?.tenantId ?? "—"}
       </div>
     </aside>
   );
 }
 
-function RoleSwitcher() {
-  const { role, setRole } = useRole();
-  const identity = ROLE_IDENTITY[role];
+function UserMenu() {
+  const navigate = useNavigate();
+  const identity = getIdentity();
+
+  function signOut() {
+    clearIdentity();
+    void navigate({ to: "/auth", replace: true });
+  }
+
+  const initials = (identity?.name ?? identity?.email ?? "?")
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 
   return (
     <div className="flex items-center gap-3">
       <div className="hidden text-right leading-tight sm:block">
-        <p className="text-sm font-semibold">{identity.name}</p>
-        <p className="text-xs text-muted-foreground">{identity.title}</p>
+        <p className="text-sm font-semibold">{identity?.name ?? identity?.email ?? "Signed in"}</p>
+        <p className="text-xs text-muted-foreground">Platform Admin</p>
       </div>
       <div className="grid size-9 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-        {identity.initials}
+        {initials}
       </div>
-      <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-        <SelectTrigger className="w-[150px]" aria-label="Switch demo role">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="admin">Platform Admin</SelectItem>
-          <SelectItem value="senior">Senior UW</SelectItem>
-          <SelectItem value="junior">Junior UW</SelectItem>
-        </SelectContent>
-      </Select>
+      <button
+        type="button"
+        onClick={signOut}
+        aria-label="Sign out"
+        className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+      >
+        <LogOut className="size-4" />
+      </button>
     </div>
   );
 }
@@ -139,8 +134,8 @@ export function PageHeader({
 }
 
 export function AdminGuard({ children }: { children: ReactNode }) {
-  const { role } = useRole();
-  if (role === "admin") return <>{children}</>;
+  const identity = getIdentity();
+  if (identity?.role === "admin") return <>{children}</>;
 
   return (
     <div className="panel mx-auto mt-10 max-w-lg p-8 text-center">
@@ -149,8 +144,7 @@ export function AdminGuard({ children }: { children: ReactNode }) {
       </div>
       <h2 className="mt-4 font-display text-lg font-semibold">Admin access required</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        The {role} role has no admin visibility. Switch to Platform Admin in the header to
-        continue.
+        This surface is for platform administrators only. Sign in with an admin account to continue.
       </p>
     </div>
   );
@@ -173,7 +167,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </span>
             ))}
           </nav>
-          <RoleSwitcher />
+          <UserMenu />
         </header>
         <main className="flex-1 px-6 py-8 lg:px-10">
           <div className="mx-auto w-full max-w-6xl">{children}</div>

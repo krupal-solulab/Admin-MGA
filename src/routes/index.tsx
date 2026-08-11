@@ -1,11 +1,21 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { Suspense } from "react";
 
 import { AdminGuard, AppShell } from "@/components/app/AppShell";
 import { AdminOverview } from "@/components/app/admin/AdminOverview";
 import { Skeleton } from "@/components/ui/skeleton";
+import { clearIdentity, getIdentity } from "@/lib/api/identity";
 
 export const Route = createFileRoute("/")({
+  ssr: false,
+  beforeLoad: () => {
+    const identity = getIdentity();
+    if (!identity) throw redirect({ to: "/auth" });
+    if (identity.role !== "admin") {
+      clearIdentity();
+      throw redirect({ to: "/auth" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Admin Overview — Coverline OS MGA" },

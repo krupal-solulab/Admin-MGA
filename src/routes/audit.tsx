@@ -1,9 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 import { AdminGuard, AppShell } from "@/components/app/AppShell";
 import { AdminAudit } from "@/components/app/admin/AdminAudit";
+import { clearIdentity, getIdentity } from "@/lib/api/identity";
 
 export const Route = createFileRoute("/audit")({
+  ssr: false,
+  beforeLoad: () => {
+    const identity = getIdentity();
+    if (!identity) throw redirect({ to: "/auth" });
+    if (identity.role !== "admin") {
+      clearIdentity();
+      throw redirect({ to: "/auth" });
+    }
+  },
   head: () => ({
     meta: [
       { title: "Activity Log — Coverline OS Admin" },
